@@ -1,0 +1,27 @@
+# Configuración del Sistema de Monitoreo de Temperatura
+
+general:
+  intervalo_lectura_s: 5
+  lecturas_para_reporte: 30
+  archivos_salida:
+    log: "sistema.log"
+    csv: "datos.csv"
+    json: "datos.json"
+    reporte_txt: "reporte.txt"
+    reporte_md: "reporte.md"
+    grafica_png: "grafica_temperatura.png"
+
+alertas:
+  umbral_alerta: 70.0
+  umbral_critico: 80.0
+  email_destino: "admin@ejemplo.com" # Cambiar al email deseado
+
+api:
+  host: "0.0.0.0"
+  port: 5001
+
+# Configuraciones específicas si se usa el sensor THT03R vía Modbus
+# (Misma estructura que usaba tu archivo anterior)
+sensor_tht03r:
+  cfg_file: "/home/pi/.scr/.scr/RPI-MDFR/RPI-MDFR.yml"
+  cfg_section: "THT03R"

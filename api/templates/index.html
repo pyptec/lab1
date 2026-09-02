@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Monitoreo de Temperatura</title>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 40px 20px;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 1.8rem;
+            color: #444;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 30px;
+        }
+        .temp {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #007bff;
+        }
+        .label {
+            font-size: 1.1rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Datos en Tiempo Real</h1>
+        <div class="grid">
+            <div>
+                <div class="label">SoC (Interna)</div>
+                <div class="temp" id="soc_val">-- °C</div>
+            </div>
+            <div>
+                <div class="label">Ambiente</div>
+                <div class="temp" id="amb_val">-- °C</div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="liveChart"></canvas>
+        </div>
+
+        <div style="margin-top: 20px; font-size: 0.9rem; color: #999;" id="status">
+            Esperando conexión...
+        </div>
+    </div>
+
+    <script>
+        // Configuración de la gráfica
+        const ctx = document.getElementById('liveChart').getContext('2d');
+        const liveChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'SoC (°C)',
+                        borderColor: '#dc3545', // Rojo
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        data: [],
+                        fill: true,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Ambiente (°C)',
+                        borderColor: '#0d6efd', // Azul
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        data: [],
+                        fill: true,
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { maxTicksLimit: 10 } }
+                }
+            }
+        });
+
+        function fetchData() {
+            fetch('/history')
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        // Tomar los últimos 30 valores para la gráfica
+                        const recentData = data.slice(-30);
+                        
+                        // Actualizar texto con el valor más reciente
+                        const last = recentData[recentData.length - 1];
+                        document.getElementById('soc_val').innerText = last.soc_temp.toFixed(2) + ' °C';
+                        document.getElementById('amb_val').innerText = last.ambient_temp.toFixed(2) + ' °C';
+                        document.getElementById('status').innerText = 'Actualizado: ' + new Date().toLocaleTimeString();
+
+                        // Extraer datos para Chart.js
+                        const labels = recentData.map(d => {
+                            const date = new Date(d.timestamp);
+                            return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                        });
+                        const socTemps = recentData.map(d => d.soc_temp);
+                        const ambTemps = recentData.map(d => d.ambient_temp);
+
+                        // Asignar datos al gráfico y actualizar
+                        liveChart.data.labels = labels;
+                        liveChart.data.datasets[0].data = socTemps;
+                        liveChart.data.datasets[1].data = ambTemps;
+                        liveChart.update();
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('status').innerText = 'Desconectado del servidor';
+                });
+        }
+        
+        // Cargar inmediatamente y luego cada 3 segundos
+        fetchData();
+        setInterval(fetchData, 3000);
+    </script>
+</body>
+</html>
