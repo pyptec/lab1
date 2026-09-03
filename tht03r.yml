@@ -1,0 +1,37 @@
+medidores:  
+  tht03r_sensor:
+    device_name: "THT03R"
+    id_device: 21
+    port: "/dev/ttyS0"
+    debug: False
+    slave_id: 4
+    baudrate: 9600
+    bytesize: 8
+    parity: N
+    stopbits: 1
+    timeout: 1
+
+    simular: false
+
+    registers:
+      - name: Temperature
+        address: 0
+        fc: 3
+        decimals: 1        # decimals = 0 → deja el valor tal cual (entero), decimals = 1 → divide el valor por 10, decimals = 2 → divide por 100
+        readWrite: "R"
+        scale: 1
+        unit: 1
+        alias: Temp
+      - name: Humidity
+        address: 1
+        fc: 3
+        decimals: 1        # decimals = 0 → deja el valor tal cual (entero), decimals = 1 → divide el valor por 10, decimals = 2 → divide por 100
+        readWrite: "R"
+        scale: 1
+        unit: 2
+        alias: Humidity
+    control:
+      hu_ppm_low: 85     # por debajo o igual a este valor → HUMEDAD ON, HUMIDIFICADOR OFF
+      hu_ppm_high: 90    # por encima o igual a este valor → HUMEDAD OFF, HUMIDIFICADOR ON 
+      temp_c_low: 18     # (opcional) °C → extractor OFF si <=
+      temp_c_high: 19    # (opcional) °C → extractor ON  si >=

@@ -23,5 +23,5 @@ api:
 # Configuraciones específicas si se usa el sensor THT03R vía Modbus
 # (Misma estructura que usaba tu archivo anterior)
 sensor_tht03r:
-  cfg_file: "/home/pi/.scr/.scr/RPI-MDFR/RPI-MDFR.yml"
-  cfg_section: "THT03R"
+  cfg_file: "/home/pi/lab1/lab1/tht03r.yml"
+  cfg_section: "tht03r_sensor"
