@@ -7,7 +7,7 @@ from .storage import DataStorage
 from .alerts import AlertManager
 from .outputs import GPIOController
 from reporting.generator import ReportGenerator
-
+from .rtc import RTCReader
 
 class MonitoringEngine:
 
