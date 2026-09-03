@@ -36,3 +36,7 @@ gpio:
     pin: 5
     cambiar_cada_ciclos: 3
     active_high: true
+
+  puerta:
+    pin: 13
+    active_high: true

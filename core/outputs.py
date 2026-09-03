@@ -1,6 +1,5 @@
-from gpiozero import OutputDevice
 from .logger import logger
-
+from gpiozero import OutputDevice, DigitalInputDevice
 
 class GPIOController:
 
@@ -50,7 +49,33 @@ class GPIOController:
         self.pilot_active_high = bool(
             pilot_cfg.get("active_high", True)
         )
+        # ==========================================
+        # ENTRADA PUERTA - GPIO13
+        # INT22 -> circuito HAT -> INT2 -> GPIO13
+        # ==========================================
 
+        door_cfg = gpio_cfg.get("puerta", {})
+
+        self.door_pin = int(
+            door_cfg.get("pin", 13)
+        )
+
+        self.door_active_high = bool(
+            door_cfg.get("active_high", True)
+        )
+
+        self.door = DigitalInputDevice(
+            self.door_pin,
+            pull_up=None,
+            active_state=self.door_active_high,
+            bounce_time=0.05
+        )
+
+        self.last_door_state = None
+
+        logger.info(
+            f"Entrada puerta inicializada | GPIO{self.door_pin}"
+        )
         # ==========================================
         # CREAR SALIDAS
         # ==========================================
@@ -179,7 +204,8 @@ class GPIOController:
 
             self.fan.close()
             self.pilot.close()
-
+            self.door.close()
+            
             logger.info(
                 "GPIO liberados correctamente."
             )
@@ -189,3 +215,47 @@ class GPIOController:
             logger.error(
                 f"Error liberando GPIO: {e}"
             )
+    # =================================================
+    # PUERTA
+    # =================================================
+
+    def read_door(self):
+
+        try:
+            # HIGH = puerta cerrada
+            # LOW  = puerta abierta
+            return bool(self.door.is_active)
+
+        except Exception as e:
+
+            logger.error(
+                f"Error leyendo puerta GPIO{self.door_pin}: {e}"
+            )
+
+            return None
+
+
+    def check_door_change(self):
+
+        estado = self.read_door()
+
+        if estado is None:
+            return None
+
+        if estado != self.last_door_state:
+
+            if estado:
+
+                logger.info(
+                    f"PUERTA CERRADA | GPIO{self.door_pin}"
+                )
+
+            else:
+
+                logger.warning(
+                    f"PUERTA ABIERTA | GPIO{self.door_pin}"
+                )
+
+            self.last_door_state = estado
+
+        return estado
