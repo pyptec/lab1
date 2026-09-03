@@ -1,4 +1,3 @@
-import subprocess
 from datetime import datetime
 
 from .logger import logger
@@ -6,52 +5,42 @@ from .logger import logger
 
 class RTCReader:
 
-    def __init__(self, device="/dev/rtc0"):
-        self.device = device
+    def __init__(self, rtc="rtc0"):
+
+        self.rtc = rtc
+
+        self.date_path = f"/sys/class/rtc/{rtc}/date"
+        self.time_path = f"/sys/class/rtc/{rtc}/time"
 
         logger.info(
-            f"RTC inicializado | dispositivo={self.device}"
+            f"RTC inicializado | {rtc}"
         )
 
     def read_datetime(self):
         """
-        Lee fecha y hora directamente desde /dev/rtc0
-        mediante hwclock.
+        Lee directamente la fecha y hora del RTC
+        administrado por el kernel de Linux.
         """
 
         try:
-            resultado = subprocess.run(
-                [
-                    "hwclock",
-                    "--show",
-                    "--rtc",
-                    self.device
-                ],
-                capture_output=True,
-                text=True,
-                timeout=2
+
+            with open(self.date_path, "r") as f:
+                fecha = f.read().strip()
+
+            with open(self.time_path, "r") as f:
+                hora = f.read().strip()
+
+            rtc_datetime = datetime.strptime(
+                f"{fecha} {hora}",
+                "%Y-%m-%d %H:%M:%S"
             )
 
-            if resultado.returncode != 0:
-                raise RuntimeError(
-                    resultado.stderr.strip()
-                )
-
-            texto = resultado.stdout.strip()
-
-            # Ejemplo:
-            # 2026-09-02 20:35:15.123456-05:00
-
-            fecha = datetime.fromisoformat(
-                texto.split()[0] + " " + texto.split()[1]
-            )
-
-            return fecha
+            return rtc_datetime
 
         except Exception as e:
 
             logger.error(
-                f"Error leyendo RTC {self.device}: "
+                f"Error leyendo RTC {self.rtc}: "
                 f"{type(e).__name__}: {e}"
             )
 
