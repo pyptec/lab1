@@ -33,6 +33,9 @@ class MonitoringEngine:
         self.alert_mgr = AlertManager(config)
         self.reporter = ReportGenerator(config)
 
+        #rtc
+        self.rtc = RTCReader()
+        
         # Historial para API
         self.history = []
 
@@ -51,6 +54,25 @@ class MonitoringEngine:
             while True:
 
                 ts = datetime.now().isoformat()
+                
+                #
+                #RTC
+                #
+                rtc_datetime = self.rtc.read_datetime()
+
+                if rtc_datetime is not None:
+
+                    ts = rtc_datetime.isoformat()
+
+                    rtc_text = rtc_datetime.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+
+                else:
+
+                    ts = datetime.now().isoformat()
+
+                    rtc_text = "RTC ERROR"
 
                 # ==========================================
                 # 1. TEMPERATURA RASPBERRY PI
@@ -117,6 +139,7 @@ class MonitoringEngine:
                 logger.info(
 
                     f"Lectura -> "
+                    f"RTC: {rtc_text} | "
                     f"SoC: {soc_temp}°C | "
                     f"Ambiente: {amb_temp}°C | "
                     f"Humedad: {humidity}%"
