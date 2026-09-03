@@ -8,6 +8,7 @@ from .alerts import AlertManager
 from .outputs import GPIOController
 from reporting.generator import ReportGenerator
 from .rtc import RTCReader
+from .ups import UPSReader
 
 class MonitoringEngine:
 
@@ -36,6 +37,10 @@ class MonitoringEngine:
         #rtc
         self.rtc = RTCReader()
         
+        #ups
+        
+        self.ups = UPSReader()
+        
         # Historial para API
         self.history = []
 
@@ -55,9 +60,9 @@ class MonitoringEngine:
 
                 ts = datetime.now().isoformat()
                 
-                #
+                #====================================
                 #RTC
-                #
+                #=====================================
                 rtc_datetime = self.rtc.read_datetime()
 
                 if rtc_datetime is not None:
@@ -113,6 +118,19 @@ class MonitoringEngine:
 
                 else:
                     door_text = "ERROR"
+                    
+                    
+                # ==========================================
+                # UPS / BATERÍA
+                # ==========================================
+
+                ups_data = self.ups.read()
+
+                battery_percent = ups_data["percent"]
+                battery_voltage = ups_data["voltage"]
+                battery_current = ups_data["current"]
+                battery_capacity = ups_data["capacity"]
+                battery_state = ups_data["state"]
                 # ==========================================
                 # 4. GUARDAR LECTURA
                 # ==========================================
@@ -122,10 +140,14 @@ class MonitoringEngine:
                     "timestamp": ts,
 
                     "soc_temp": soc_temp,
-
                     "ambient_temp": amb_temp,
-
                     "humidity": humidity,
+                    
+                    "battery_percent": battery_percent,
+                    "battery_voltage": battery_voltage,
+                    "battery_current": battery_current,
+                    "battery_capacity": battery_capacity,
+                    "battery_state": battery_state,
                     
                     "door_closed": door_closed,
                     "pilot_on": self.gpio.pilot_state,
@@ -146,8 +168,11 @@ class MonitoringEngine:
                     f"RTC: {rtc_text} | "
                     f"SoC: {soc_temp}°C | "
                     f"Ambiente: {amb_temp}°C | "
-                    f"Humedad: {humidity}%"
-                    f"Puerta: {door_text}"
+                    f"Humedad: {humidity}% | "
+                    f"Puerta: {door_text} | "
+                    f"Batería: {battery_percent}% | "
+                    f"VBAT: {battery_voltage}V | "
+                    f"UPS: {battery_state}"
                 )
 
                 # ==========================================

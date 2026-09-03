@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
 
-    <title>Monitoreo SAMEE200</title>
+    <title>Monitoreo JPCE</title>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -26,7 +26,7 @@
             padding: 35px;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            max-width: 950px;
+            max-width: 1100px;
             width: 100%;
             text-align: center;
         }
@@ -36,9 +36,13 @@
             color: #444;
         }
 
+        /* ===========================
+           VARIABLES
+           =========================== */
+
         .grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -63,6 +67,22 @@
             color: #17a2b8;
         }
 
+        .battery {
+            color: #6c757d;
+        }
+
+        .battery-extra {
+            margin-top: 7px;
+            font-size: 0.95rem;
+            color: #666;
+        }
+
+        .battery-state {
+            margin-top: 5px;
+            font-weight: bold;
+            color: #444;
+        }
+
         .label {
             font-size: 0.95rem;
             color: #666;
@@ -71,7 +91,7 @@
         }
 
         /* ===========================
-           INDICADORES
+           INDICADORES DIGITALES
            =========================== */
 
         .indicators {
@@ -118,6 +138,10 @@
             font-weight: bold;
         }
 
+        /* ===========================
+           GRÁFICA
+           =========================== */
+
         .chart-container {
             position: relative;
             height: 300px;
@@ -131,6 +155,18 @@
             color: #777;
         }
 
+        /* ===========================
+           RESPONSIVE
+           =========================== */
+
+        @media (max-width: 900px) {
+
+            .grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+        }
+
         @media (max-width: 700px) {
 
             .grid {
@@ -140,6 +176,7 @@
             .indicators {
                 grid-template-columns: 1fr;
             }
+
         }
 
     </style>
@@ -153,10 +190,12 @@
     <h1>Monitoreo JPCE</h1>
 
     <!-- ======================================
-         VARIABLES ANALÓGICAS / MEDIDAS
+         VARIABLES MEDIDAS
          ====================================== -->
 
     <div class="grid">
+
+        <!-- SoC -->
 
         <div class="card">
 
@@ -175,6 +214,8 @@
         </div>
 
 
+        <!-- Temperatura Ambiente -->
+
         <div class="card">
 
             <div class="label">
@@ -192,6 +233,8 @@
         </div>
 
 
+        <!-- Humedad -->
+
         <div class="card">
 
             <div class="label">
@@ -203,6 +246,41 @@
                 id="hum_val">
 
                 -- %
+
+            </div>
+
+        </div>
+
+
+        <!-- Batería UPS -->
+
+        <div class="card">
+
+            <div class="label">
+                Batería UPS
+            </div>
+
+            <div
+                class="value battery"
+                id="battery_val">
+
+                -- %
+
+            </div>
+
+            <div
+                class="battery-extra"
+                id="battery_voltage">
+
+                -- V
+
+            </div>
+
+            <div
+                class="battery-state"
+                id="battery_state">
+
+                --
 
             </div>
 
@@ -309,7 +387,6 @@
 
     </div>
 
-
 </div>
 
 
@@ -353,11 +430,9 @@
 
                 {
 
-                    label:
-                        'Ambiente (°C)',
+                    label: 'Ambiente (°C)',
 
-                    borderColor:
-                        '#0d6efd',
+                    borderColor: '#0d6efd',
 
                     backgroundColor:
                         'rgba(13,110,253,0.1)',
@@ -388,15 +463,18 @@
                         maxTicksLimit: 10
 
                     }
+
                 }
+
             }
+
         }
 
     });
 
 
     // ==========================================
-    // ACTUALIZAR INDICADORES
+    // INDICADORES DIGITALES
     // ==========================================
 
     function actualizarIndicadores(last) {
@@ -522,6 +600,126 @@
 
 
     // ==========================================
+    // ACTUALIZAR BATERÍA
+    // ==========================================
+
+    function actualizarBateria(last) {
+
+        const batteryVal =
+            document.getElementById(
+                'battery_val'
+            );
+
+        const batteryVoltage =
+            document.getElementById(
+                'battery_voltage'
+            );
+
+        const batteryState =
+            document.getElementById(
+                'battery_state'
+            );
+
+
+        // --------------------------------------
+        // PORCENTAJE
+        // --------------------------------------
+
+        if (
+            last.battery_percent !== null &&
+            last.battery_percent !== undefined
+        ) {
+
+            batteryVal.innerText =
+                last.battery_percent + ' %';
+
+        }
+
+        else {
+
+            batteryVal.innerText =
+                '-- %';
+
+        }
+
+
+        // --------------------------------------
+        // VOLTAJE
+        // --------------------------------------
+
+        if (
+            last.battery_voltage !== null &&
+            last.battery_voltage !== undefined
+        ) {
+
+            batteryVoltage.innerText =
+                last.battery_voltage.toFixed(3)
+                + ' V';
+
+        }
+
+        else {
+
+            batteryVoltage.innerText =
+                '-- V';
+
+        }
+
+
+        // --------------------------------------
+        // ESTADO UPS
+        // --------------------------------------
+
+        batteryState.innerText =
+            last.battery_state ||
+            'SIN DATOS';
+
+
+        // --------------------------------------
+        // COLOR BATERÍA
+        // --------------------------------------
+
+        if (
+            last.battery_percent !== null &&
+            last.battery_percent !== undefined
+        ) {
+
+            if (last.battery_percent >= 60) {
+
+                batteryVal.style.color =
+                    '#28a745';
+
+            }
+
+            else if (
+                last.battery_percent >= 30
+            ) {
+
+                batteryVal.style.color =
+                    '#ffc107';
+
+            }
+
+            else {
+
+                batteryVal.style.color =
+                    '#dc3545';
+
+            }
+
+        }
+
+        else {
+
+            batteryVal.style.color =
+                '#6c757d';
+
+        }
+
+    }
+
+
+    // ==========================================
     // LEER API
     // ==========================================
 
@@ -551,41 +749,79 @@
 
 
                     // ==================================
-                    // VALORES ACTUALES
+                    // SoC
                     // ==================================
 
-                    document
-                        .getElementById(
-                            'soc_val'
-                        )
-                        .innerText =
-                            last.soc_temp
-                            .toFixed(2)
-                            + ' °C';
+                    if (
+                        last.soc_temp !== null &&
+                        last.soc_temp !== undefined
+                    ) {
 
+                        document
+                            .getElementById(
+                                'soc_val'
+                            )
+                            .innerText =
+                                last.soc_temp
+                                .toFixed(2)
+                                + ' °C';
 
-                    document
-                        .getElementById(
-                            'amb_val'
-                        )
-                        .innerText =
-                            last.ambient_temp
-                            .toFixed(2)
-                            + ' °C';
-
-
-                    document
-                        .getElementById(
-                            'hum_val'
-                        )
-                        .innerText =
-                            last.humidity
-                            .toFixed(2)
-                            + ' %';
+                    }
 
 
                     // ==================================
-                    // INDICADORES
+                    // TEMPERATURA AMBIENTE
+                    // ==================================
+
+                    if (
+                        last.ambient_temp !== null &&
+                        last.ambient_temp !== undefined
+                    ) {
+
+                        document
+                            .getElementById(
+                                'amb_val'
+                            )
+                            .innerText =
+                                last.ambient_temp
+                                .toFixed(2)
+                                + ' °C';
+
+                    }
+
+
+                    // ==================================
+                    // HUMEDAD
+                    // ==================================
+
+                    if (
+                        last.humidity !== null &&
+                        last.humidity !== undefined
+                    ) {
+
+                        document
+                            .getElementById(
+                                'hum_val'
+                            )
+                            .innerText =
+                                last.humidity
+                                .toFixed(2)
+                                + ' %';
+
+                    }
+
+
+                    // ==================================
+                    // BATERÍA UPS
+                    // ==================================
+
+                    actualizarBateria(
+                        last
+                    );
+
+
+                    // ==================================
+                    // PUERTA / PILOTO / VENTILADOR
                     // ==================================
 
                     actualizarIndicadores(
@@ -607,7 +843,7 @@
 
 
                     // ==================================
-                    // GRÁFICA
+                    // DATOS PARA GRÁFICA
                     // ==================================
 
                     const labels =
@@ -633,7 +869,9 @@
                                                 '2-digit'
                                         }
                                     );
+
                             }
+
                         );
 
 
@@ -650,6 +888,10 @@
                                 d.ambient_temp
                         );
 
+
+                    // ==================================
+                    // ACTUALIZAR GRÁFICA
+                    // ==================================
 
                     liveChart.data.labels =
                         labels;
@@ -676,6 +918,11 @@
             })
 
             .catch(error => {
+
+                console.error(
+                    "Error consultando /history:",
+                    error
+                );
 
                 document
                     .getElementById(
