@@ -35,4 +35,4 @@ gpio:
   piloto:
     pin: 5
     cambiar_cada_ciclos: 3
-    active_high: true
+    active_high: false
