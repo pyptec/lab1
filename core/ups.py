@@ -1,5 +1,6 @@
 import subprocess
 import re
+import time
 
 from .logger import logger
 
@@ -10,137 +11,199 @@ class UPSReader:
 
         self.script = "/home/pi/UPS_HAT_E/ups.py"
 
+        # Última lectura válida.
+        # Si en un ciclo falla la UPS no destruimos inmediatamente
+        # el último dato conocido.
+        self.last_data = {
+            "percent": None,
+            "voltage": None,
+            "current": None,
+            "capacity": None,
+            "state": "SIN DATOS"
+        }
+
         logger.info(
-            f"UPS inicializada | script={self.script}"
+            f"UPS inicializada | {self.script}"
         )
+
 
     def read(self):
 
+        proceso = None
+
         try:
 
-            resultado = subprocess.run(
+            # -u = salida Python sin buffer.
+            # Esto permite capturar las líneas mientras ups.py continúa.
+            proceso = subprocess.Popen(
                 [
                     "/usr/bin/python3",
+                    "-u",
                     self.script
                 ],
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=5
+                bufsize=1
             )
 
-            if resultado.returncode != 0:
+            inicio = time.monotonic()
+
+            estado = None
+            porcentaje = None
+            voltaje_mv = None
+            corriente_ma = None
+            capacidad_mah = None
+
+            while True:
+
+                # Timeout total para obtener UNA lectura
+                if time.monotonic() - inicio > 4:
+                    break
+
+                linea = proceso.stdout.readline()
+
+                if not linea:
+
+                    if proceso.poll() is not None:
+                        break
+
+                    time.sleep(0.05)
+                    continue
+
+                linea = linea.strip()
+
+                # ----------------------------
+                # ESTADO
+                # ----------------------------
+
+                if "Charging state" in linea:
+                    estado = "CARGANDO"
+
+                elif "Discharging state" in linea:
+                    estado = "DESCARGANDO"
+
+                # ----------------------------
+                # VOLTAJE BATERÍA
+                # ----------------------------
+
+                match = re.search(
+                    r"Battery Voltage\s+(-?\d+)",
+                    linea,
+                    re.IGNORECASE
+                )
+
+                if match:
+                    voltaje_mv = int(match.group(1))
+
+                # ----------------------------
+                # CORRIENTE BATERÍA
+                # ----------------------------
+
+                match = re.search(
+                    r"Battery Current\s+(-?\d+)",
+                    linea,
+                    re.IGNORECASE
+                )
+
+                if match:
+                    corriente_ma = int(match.group(1))
+
+                # ----------------------------
+                # PORCENTAJE
+                # ----------------------------
+
+                match = re.search(
+                    r"Battery Percent\s+(\d+)",
+                    linea,
+                    re.IGNORECASE
+                )
+
+                if match:
+                    porcentaje = int(match.group(1))
+
+                # ----------------------------
+                # CAPACIDAD
+                # ----------------------------
+
+                match = re.search(
+                    r"Remaining Capacity\s+(\d+)",
+                    linea,
+                    re.IGNORECASE
+                )
+
+                if match:
+                    capacidad_mah = int(match.group(1))
+
+                # Ya tenemos lo necesario.
+                # No necesitamos esperar que ups.py termine.
+                if (
+                    porcentaje is not None
+                    and voltaje_mv is not None
+                    and estado is not None
+                ):
+                    break
+
+
+            # Detener el programa externo después
+            # de obtener una lectura.
+            if proceso.poll() is None:
+                proceso.terminate()
+
+                try:
+                    proceso.wait(timeout=1)
+
+                except subprocess.TimeoutExpired:
+                    proceso.kill()
+
+
+            # Debemos tener como mínimo porcentaje y voltaje.
+            if porcentaje is None or voltaje_mv is None:
 
                 raise RuntimeError(
-                    resultado.stderr.strip()
+                    "UPS no entregó una lectura completa"
                 )
 
-            salida = resultado.stdout
 
-            # ==========================================
-            # ESTADO
-            # ==========================================
-
-            if "Charging state" in salida:
-
-                estado = "CARGANDO"
-
-            elif "Discharging state" in salida:
-
-                estado = "DESCARGANDO"
-
-            else:
-
-                estado = "DESCONOCIDO"
-
-            # ==========================================
-            # BATERÍA
-            # ==========================================
-
-            porcentaje = self._buscar(
-                salida,
-                r"Battery Percent\s+(\d+)"
-            )
-
-            voltaje_mv = self._buscar(
-                salida,
-                r"Battery Voltage\s+(-?\d+)"
-            )
-
-            corriente_ma = self._buscar(
-                salida,
-                r"Battery Current\s+(-?\d+)"
-            )
-
-            capacidad_mah = self._buscar(
-                salida,
-                r"Remaining Capacity\s+(\d+)"
-            )
-
-            # ==========================================
-            # CONVERSIÓN
-            # ==========================================
-
-            porcentaje = (
-                int(porcentaje)
-                if porcentaje is not None
-                else None
-            )
-
-            voltaje = (
-                round(
-                    int(voltaje_mv) / 1000.0,
-                    3
-                )
-                if voltaje_mv is not None
-                else None
-            )
-
-            corriente = (
-                int(corriente_ma)
-                if corriente_ma is not None
-                else None
-            )
-
-            capacidad = (
-                int(capacidad_mah)
-                if capacidad_mah is not None
-                else None
-            )
-
-            return {
+            data = {
                 "percent": porcentaje,
-                "voltage": voltaje,
-                "current": corriente,
-                "capacity": capacidad,
-                "state": estado
+
+                "voltage": round(
+                    voltaje_mv / 1000.0,
+                    3
+                ),
+
+                "current": corriente_ma,
+
+                "capacity": capacidad_mah,
+
+                "state": estado or "DESCONOCIDO"
             }
+
+            self.last_data = data
+
+            return data
+
 
         except Exception as e:
 
-            logger.error(
-                f"Error leyendo UPS: "
+            # Evitamos imprimir el traceback gigante
+            logger.warning(
+                f"UPS sin lectura nueva | "
                 f"{type(e).__name__}: {e}"
             )
 
-            return {
-                "percent": None,
-                "voltage": None,
-                "current": None,
-                "capacity": None,
-                "state": "ERROR"
-            }
+            return self.last_data
 
-    @staticmethod
-    def _buscar(texto, patron):
 
-        resultado = re.search(
-            patron,
-            texto,
-            re.IGNORECASE
-        )
+        finally:
 
-        if resultado:
+            if proceso is not None:
 
-            return resultado.group(1)
+                try:
 
-        return None
+                    if proceso.poll() is None:
+                        proceso.kill()
+
+                except Exception:
+                    pass
