@@ -75,7 +75,22 @@ class MonitoringEngine:
                 amb_temp, humidity = (
                     self.amb_sensor.read()
                 )
+                # ==========================================
+                # PUERTA GPIO13
+                # HIGH = CERRADA
+                # LOW  = ABIERTA
+                # ==========================================
 
+                door_closed = self.gpio.check_door_change()
+
+                if door_closed is True:
+                    door_text = "CERRADA"
+
+                elif door_closed is False:
+                    door_text = "ABIERTA"
+
+                else:
+                    door_text = "ERROR"
                 # ==========================================
                 # 4. GUARDAR LECTURA
                 # ==========================================
@@ -105,6 +120,7 @@ class MonitoringEngine:
                     f"SoC: {soc_temp}°C | "
                     f"Ambiente: {amb_temp}°C | "
                     f"Humedad: {humidity}%"
+                    f"Puerta: {door_text}"
                 )
 
                 # ==========================================
