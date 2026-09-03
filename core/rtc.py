@@ -1,77 +1,57 @@
+import subprocess
 from datetime import datetime
-from smbus2 import SMBus
 
 from .logger import logger
 
 
 class RTCReader:
 
-    DS3231_ADDR = 0x68
-
-    def __init__(self, bus_number=1):
-
-        self.bus_number = bus_number
+    def __init__(self, device="/dev/rtc0"):
+        self.device = device
 
         logger.info(
-            f"RTC DS3231 inicializado | "
-            f"I2C bus={self.bus_number} | "
-            f"address=0x{self.DS3231_ADDR:02X}"
+            f"RTC inicializado | dispositivo={self.device}"
         )
 
-    @staticmethod
-    def _bcd_to_dec(value):
-        return (value >> 4) * 10 + (value & 0x0F)
-
     def read_datetime(self):
+        """
+        Lee fecha y hora directamente desde /dev/rtc0
+        mediante hwclock.
+        """
 
         try:
+            resultado = subprocess.run(
+                [
+                    "hwclock",
+                    "--show",
+                    "--rtc",
+                    self.device
+                ],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
 
-            with SMBus(self.bus_number) as bus:
-
-                data = bus.read_i2c_block_data(
-                    self.DS3231_ADDR,
-                    0x00,
-                    7
+            if resultado.returncode != 0:
+                raise RuntimeError(
+                    resultado.stderr.strip()
                 )
 
-            segundos = self._bcd_to_dec(
-                data[0] & 0x7F
+            texto = resultado.stdout.strip()
+
+            # Ejemplo:
+            # 2026-09-02 20:35:15.123456-05:00
+
+            fecha = datetime.fromisoformat(
+                texto.split()[0] + " " + texto.split()[1]
             )
 
-            minutos = self._bcd_to_dec(
-                data[1] & 0x7F
-            )
-
-            # DS3231 configurado en formato 24 horas
-            horas = self._bcd_to_dec(
-                data[2] & 0x3F
-            )
-
-            dia = self._bcd_to_dec(
-                data[4] & 0x3F
-            )
-
-            mes = self._bcd_to_dec(
-                data[5] & 0x1F
-            )
-
-            anio = 2000 + self._bcd_to_dec(
-                data[6]
-            )
-
-            return datetime(
-                anio,
-                mes,
-                dia,
-                horas,
-                minutos,
-                segundos
-            )
+            return fecha
 
         except Exception as e:
 
             logger.error(
-                f"Error leyendo RTC DS3231: "
+                f"Error leyendo RTC {self.device}: "
                 f"{type(e).__name__}: {e}"
             )
 
