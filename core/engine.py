@@ -7,64 +7,158 @@ from .storage import DataStorage
 from .alerts import AlertManager
 from reporting.generator import ReportGenerator
 
+
 class MonitoringEngine:
+
     def __init__(self, config):
+
         self.config = config
+
         self.intervalo = config["general"]["intervalo_lectura_s"]
-        self.lecturas_para_reporte = config["general"]["lecturas_para_reporte"]
-        
-        # Inicializar manejadores
+
+        self.lecturas_para_reporte = (
+            config["general"]["lecturas_para_reporte"]
+        )
+
+        # Sensores
         self.soc_sensor = SoCSensor()
         self.amb_sensor = AmbientSensor(config)
+
+        # Servicios
         self.storage = DataStorage(config)
         self.alert_mgr = AlertManager(config)
         self.reporter = ReportGenerator(config)
-        
-        # Estado de memoria (para la API)
+
+        # Historial utilizado por la API
         self.history = []
+
         self.start_time = datetime.now()
-        
+
     def run(self):
-        logger.info("Iniciando Motor de Monitoreo de Temperatura...")
-        
+
+        logger.info(
+            "Iniciando Motor de Monitoreo..."
+        )
+
         ciclos = 0
+
         try:
+
             while True:
-                # Leer Sensores
+
                 ts = datetime.now().isoformat()
-                soc_temp = self.soc_sensor.read_temperature()
-                amb_temp = self.amb_sensor.read_temperature()
-                
-                # Guardar en memoria
+
+                # --------------------------------
+                # Temperatura Raspberry Pi
+                # --------------------------------
+
+                soc_temp = (
+                    self.soc_sensor.read_temperature()
+                )
+
+                # --------------------------------
+                # Sensor THT03R Modbus
+                # --------------------------------
+
+                amb_temp, humidity = (
+                    self.amb_sensor.read()
+                )
+
+                # --------------------------------
+                # Guardar lectura en memoria
+                # --------------------------------
+
                 lectura = {
+
                     "timestamp": ts,
+
                     "soc_temp": soc_temp,
-                    "ambient_temp": amb_temp
+
+                    "ambient_temp": amb_temp,
+
+                    "humidity": humidity
                 }
-                self.history.append(lectura)
-                
-                # Log y CSV
-                logger.info(f"Lectura -> SoC: {soc_temp}°C | Amb: {amb_temp}°C")
-                self.storage.save_reading(ts, soc_temp, amb_temp)
-                
+
+                self.history.append(
+                    lectura
+                )
+
+                # --------------------------------
+                # Log
+                # --------------------------------
+
+                logger.info(
+                    f"Lectura -> "
+                    f"SoC: {soc_temp}°C | "
+                    f"Ambiente: {amb_temp}°C | "
+                    f"Humedad: {humidity}%"
+                )
+
+                # --------------------------------
+                # CSV
+                # --------------------------------
+
+                self.storage.save_reading(
+                    ts,
+                    soc_temp,
+                    amb_temp,
+                    humidity
+                )
+
+                # --------------------------------
                 # JSON
-                self.storage.export_json(self.history)
-                
+                # --------------------------------
+
+                self.storage.export_json(
+                    self.history
+                )
+
+                # --------------------------------
                 # Alertas
-                self.alert_mgr.check_alerts(soc_temp, amb_temp)
-                
+                # --------------------------------
+
+                self.alert_mgr.check_alerts(
+                    soc_temp,
+                    amb_temp
+                )
+
                 ciclos += 1
-                
-                # Reportes (cada N lecturas, requerimiento Nivel 1 y 2)
-                if ciclos % self.lecturas_para_reporte == 0:
-                    logger.info(f"Generando reportes periódicos (Ciclo {ciclos})")
-                    self.reporter.generar_reportes(self.history, self.start_time)
-                
-                # Dormir
-                time.sleep(self.intervalo)
-                
+
+                # --------------------------------
+                # Reporte periódico
+                # --------------------------------
+
+                if (
+                    ciclos
+                    % self.lecturas_para_reporte
+                    == 0
+                ):
+
+                    logger.info(
+                        f"Generando reportes "
+                        f"(Ciclo {ciclos})"
+                    )
+
+                    self.reporter.generar_reportes(
+                        self.history,
+                        self.start_time
+                    )
+
+                time.sleep(
+                    self.intervalo
+                )
+
         except KeyboardInterrupt:
-            logger.info("Deteniendo motor por interrupción de teclado...")
-            # Generar reporte final antes de salir
-            self.reporter.generar_reportes(self.history, self.start_time)
-            logger.info("Sistema detenido limpiamente.")
+
+            logger.info(
+                "Deteniendo sistema..."
+            )
+
+            self.reporter.generar_reportes(
+                self.history,
+                self.start_time
+            )
+
+            logger.info(
+                "Sistema detenido limpiamente."
+            )

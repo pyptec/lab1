@@ -1,63 +1,220 @@
 import random
-import sys
+import yaml
+import minimalmodbus
+import serial
+
 from .logger import logger
+
 
 class SoCSensor:
     def __init__(self):
         self.path = "/sys/class/thermal/thermal_zone0/temp"
-        
+
     def read_temperature(self):
-        """Lee la temperatura del SoC de la Raspberry Pi y la convierte a Celsius."""
+        """
+        Lee la temperatura interna del SoC de la Raspberry Pi.
+        """
         try:
             with open(self.path, "r") as f:
                 temp_miligrados = float(f.read().strip())
-                temp_celsius = temp_miligrados / 1000.0
-                return round(temp_celsius, 2)
+
+            temp_celsius = temp_miligrados / 1000.0
+            return round(temp_celsius, 2)
+
         except Exception as e:
-            logger.warning(f"No se pudo leer el SoC desde {self.path}. Usando valor de prueba. Error: {e}")
-            return round(random.uniform(40.0, 50.0), 2)
+            logger.warning(
+                f"No se pudo leer temperatura del SoC: {e}"
+            )
+
+            return None
+
 
 class AmbientSensor:
-    def __init__(self, config=None):
+    def __init__(self, config):
         self.config = config
-        self.use_simulation = True
-        
-        # Intentamos importar los módulos del THT03R que tenías en el entorno
+
+        sensor_cfg = config.get("sensor_tht03r", {})
+
+        self.cfg_file = sensor_cfg.get(
+            "cfg_file",
+            "/home/pi/lab1/lab1/tht03r.yml"
+        )
+
+        self.cfg_section = sensor_cfg.get(
+            "cfg_section",
+            "tht03r_sensor"
+        )
+
+        self.sensor_config = None
+        self.instrument = None
+
+        self._load_config()
+        self._create_instrument()
+
+    def _load_config(self):
+        """
+        Carga la configuración Modbus desde tht03r.yml.
+        """
+
         try:
-            import os
-            # base_dir es proyecto_temperatura, parent_dir es Proyecto (donde están util.py y modbusdevices.py)
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            parent_dir = os.path.dirname(base_dir)
-            sys.path.append(parent_dir)
-            import util
-            import modbusdevices
-            self.util = util
-            self.modbusdevices = modbusdevices
-            
-            if self.config and "sensor_tht03r" in self.config:
-                self.cfg_file = self.config["sensor_tht03r"].get("cfg_file")
-                self.cfg_section = self.config["sensor_tht03r"].get("cfg_section")
-                if self.cfg_file and self.cfg_section:
-                    self.tht03r_config = self.util.cargar_configuracion(self.cfg_file, self.cfg_section)
-                    self.use_simulation = False
-                    logger.info("Sensor THT03R reconocido e inicializado correctamente.")
+            with open(self.cfg_file, "r") as f:
+                cfg = yaml.safe_load(f)
+
+            self.sensor_config = (
+                cfg["medidores"][self.cfg_section]
+            )
+
+            logger.info(
+                f"THT03R configurado desde {self.cfg_file}"
+            )
+
         except Exception as e:
-            logger.warning(f"No se pudo inicializar THT03R (usaremos simulación): {e}")
+            logger.error(
+                f"No se pudo cargar configuración THT03R: {e}"
+            )
+            raise
+
+    def _create_instrument(self):
+        """
+        Inicializa MinimalModbus.
+        """
+
+        cfg = self.sensor_config
+
+        try:
+            self.instrument = minimalmodbus.Instrument(
+                cfg["port"],
+                int(cfg["slave_id"])
+            )
+
+            self.instrument.mode = minimalmodbus.MODE_RTU
+
+            self.instrument.serial.baudrate = int(
+                cfg["baudrate"]
+            )
+
+            self.instrument.serial.bytesize = int(
+                cfg["bytesize"]
+            )
+
+            self.instrument.serial.stopbits = int(
+                cfg["stopbits"]
+            )
+
+            self.instrument.serial.timeout = float(
+                cfg["timeout"]
+            )
+
+            parity_map = {
+                "N": serial.PARITY_NONE,
+                "E": serial.PARITY_EVEN,
+                "O": serial.PARITY_ODD
+            }
+
+            self.instrument.serial.parity = parity_map.get(
+                str(cfg["parity"]).upper(),
+                serial.PARITY_NONE
+            )
+
+            self.instrument.clear_buffers_before_each_transaction = True
+            self.instrument.close_port_after_each_call = True
+
+            self.instrument.debug = bool(
+                cfg.get("debug", False)
+            )
+
+            logger.info(
+                f"THT03R Modbus inicializado "
+                f"Puerto={cfg['port']} "
+                f"Slave={cfg['slave_id']} "
+                f"Baud={cfg['baudrate']}"
+            )
+
+        except Exception as e:
+
+            logger.error(
+                f"Error inicializando Modbus THT03R: {e}"
+            )
+
+            raise
+
+    def _read_register(self, name):
+        """
+        Busca y lee un registro por nombre desde el YAML.
+        """
+
+        reg = next(
+            (
+                r for r in self.sensor_config["registers"]
+                if r["name"].lower() == name.lower()
+            ),
+            None
+        )
+
+        if reg is None:
+            raise ValueError(
+                f"Registro {name} no encontrado en YAML"
+            )
+
+        return self.instrument.read_register(
+            registeraddress=int(reg["address"]),
+            number_of_decimals=int(
+                reg.get("decimals", 0)
+            ),
+            functioncode=int(
+                reg.get("fc", 3)
+            ),
+            signed=False
+        )
+
+    def read(self):
+        """
+        Lee temperatura y humedad del THT03R.
+
+        Retorna:
+
+        temperatura, humedad
+        """
+
+        try:
+
+            temperatura = self._read_register(
+                "Temperature"
+            )
+
+            humedad = self._read_register(
+                "Humidity"
+            )
+
+            temperatura = round(
+                float(temperatura), 2
+            )
+
+            humedad = round(
+                float(humedad), 2
+            )
+
+            logger.info(
+                f"THT03R -> "
+                f"Temperatura: {temperatura}°C | "
+                f"Humedad: {humedad}%"
+            )
+
+            return temperatura, humedad
+
+        except Exception as e:
+
+            logger.error(
+                f"Error leyendo THT03R por Modbus: "
+                f"{type(e).__name__}: {e}"
+            )
+
+            return None, None
 
     def read_temperature(self):
-        """Lee la temperatura ambiente real o simulada."""
-        if self.use_simulation:
-            # Rango razonable para temperatura ambiente
-            return round(random.uniform(18.0, 25.0), 2)
-        else:
-            try:
-                payload = self.modbusdevices.payload_event_modbus(self.tht03r_config)
-                if payload and "d" in payload and len(payload["d"]) > 0:
-                    valores = payload["d"][0]["v"]
-                    if valores and len(valores) > 0:
-                        temp = float(valores[0])
-                        return round(temp, 2)
-            except Exception as e:
-                logger.error(f"Error leyendo THT03R real, volviendo a simulación en este ciclo: {e}")
-                
-            return round(random.uniform(18.0, 25.0), 2)
+        """
+        Mantiene compatibilidad con código anterior.
+        """
+
+        temperatura, _ = self.read()
+        return temperatura
