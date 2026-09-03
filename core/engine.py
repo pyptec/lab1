@@ -5,9 +5,8 @@ from .logger import logger
 from .sensors import SoCSensor, AmbientSensor
 from .storage import DataStorage
 from .alerts import AlertManager
-from reporting.generator import ReportGenerator
-from .alerts import AlertManager
 from .outputs import GPIOController
+from reporting.generator import ReportGenerator
 
 
 class MonitoringEngine:
@@ -25,8 +24,8 @@ class MonitoringEngine:
         # Sensores
         self.soc_sensor = SoCSensor()
         self.amb_sensor = AmbientSensor(config)
-        
-        #gpio
+
+        # GPIO
         self.gpio = GPIOController(config)
 
         # Servicios
@@ -34,7 +33,7 @@ class MonitoringEngine:
         self.alert_mgr = AlertManager(config)
         self.reporter = ReportGenerator(config)
 
-        # Historial utilizado por la API
+        # Historial para API
         self.history = []
 
         self.start_time = datetime.now()
@@ -53,25 +52,33 @@ class MonitoringEngine:
 
                 ts = datetime.now().isoformat()
 
-                # --------------------------------
-                # Temperatura Raspberry Pi
-                # --------------------------------
+                # ==========================================
+                # 1. TEMPERATURA RASPBERRY PI
+                # ==========================================
 
                 soc_temp = (
                     self.soc_sensor.read_temperature()
                 )
 
-                # --------------------------------
-                # Sensor THT03R Modbus
-                # --------------------------------
+                # ==========================================
+                # 2. CONTROL VENTILADOR
+                # ==========================================
+
+                self.gpio.update_fan(
+                    soc_temp
+                )
+
+                # ==========================================
+                # 3. SENSOR THT03R MODBUS
+                # ==========================================
 
                 amb_temp, humidity = (
                     self.amb_sensor.read()
                 )
 
-                # --------------------------------
-                # Guardar lectura en memoria
-                # --------------------------------
+                # ==========================================
+                # 4. GUARDAR LECTURA
+                # ==========================================
 
                 lectura = {
 
@@ -88,50 +95,65 @@ class MonitoringEngine:
                     lectura
                 )
 
-                # --------------------------------
-                # Log
-                # --------------------------------
+                # ==========================================
+                # 5. LOG
+                # ==========================================
 
                 logger.info(
+
                     f"Lectura -> "
                     f"SoC: {soc_temp}°C | "
                     f"Ambiente: {amb_temp}°C | "
                     f"Humedad: {humidity}%"
                 )
 
-                # --------------------------------
-                # CSV
-                # --------------------------------
+                # ==========================================
+                # 6. CSV
+                # ==========================================
 
                 self.storage.save_reading(
+
                     ts,
                     soc_temp,
                     amb_temp,
                     humidity
                 )
 
-                # --------------------------------
-                # JSON
-                # --------------------------------
+                # ==========================================
+                # 7. JSON
+                # ==========================================
 
                 self.storage.export_json(
                     self.history
                 )
 
-                # --------------------------------
-                # Alertas
-                # --------------------------------
+                # ==========================================
+                # 8. ALERTAS
+                # ==========================================
 
                 self.alert_mgr.check_alerts(
+
                     soc_temp,
                     amb_temp
                 )
 
+                # ==========================================
+                # 9. CONTADOR DE CICLOS
+                # ==========================================
+
                 ciclos += 1
 
-                # --------------------------------
-                # Reporte periódico
-                # --------------------------------
+                # ==========================================
+                # 10. PILOTO GPIO5
+                # ==========================================
+
+                self.gpio.update_pilot(
+                    ciclos
+                )
+
+                # ==========================================
+                # 11. REPORTE PERIÓDICO
+                # ==========================================
 
                 if (
                     ciclos
@@ -140,14 +162,20 @@ class MonitoringEngine:
                 ):
 
                     logger.info(
+
                         f"Generando reportes "
                         f"(Ciclo {ciclos})"
                     )
 
                     self.reporter.generar_reportes(
+
                         self.history,
                         self.start_time
                     )
+
+                # ==========================================
+                # 12. ESPERA
+                # ==========================================
 
                 time.sleep(
                     self.intervalo
@@ -159,7 +187,12 @@ class MonitoringEngine:
                 "Deteniendo sistema..."
             )
 
+            # Apagar y liberar GPIO
+            self.gpio.cleanup()
+
+            # Reporte final
             self.reporter.generar_reportes(
+
                 self.history,
                 self.start_time
             )
