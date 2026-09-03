@@ -162,17 +162,40 @@ class MonitoringEngine:
                 # 5. LOG
                 # ==========================================
 
-                logger.info(
+                battery_percent_text = (
+                    f"{battery_percent}%"
+                    if battery_percent is not None
+                    else "--"
+                )
 
-                    f"Lectura -> "
-                    f"RTC: {rtc_text} | "
-                    f"SoC: {soc_temp}°C | "
-                    f"Ambiente: {amb_temp}°C | "
-                    f"Humedad: {humidity}% | "
-                    f"Puerta: {door_text} | "
-                    f"Batería: {battery_percent}% | "
-                    f"VBAT: {battery_voltage}V | "
-                    f"UPS: {battery_state}"
+                battery_voltage_text = (
+                    f"{battery_voltage:.2f}V"
+                    if battery_voltage is not None
+                    else "--"
+                )
+
+                fan_text = (
+                    "ON"
+                    if self.gpio.fan_state
+                    else "OFF"
+                )
+
+                pilot_text = (
+                    "ON"
+                    if self.gpio.pilot_state
+                    else "OFF"
+                )
+
+                logger.info(
+                    f"{rtc_text} | "
+                    f"TEMP {amb_temp:.1f}°C | "
+                    f"HR {humidity:.1f}% | "
+                    f"SOC {soc_temp:.1f}°C | "
+                    f"PUERTA {door_text} | "
+                    f"FAN {fan_text} | "
+                    f"PILOTO {pilot_text} | "
+                    f"BAT {battery_percent_text} {battery_voltage_text} | "
+                    f"UPS {battery_state}"
                 )
 
                 # ==========================================
