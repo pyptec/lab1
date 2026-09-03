@@ -125,7 +125,11 @@ class MonitoringEngine:
 
                     "ambient_temp": amb_temp,
 
-                    "humidity": humidity
+                    "humidity": humidity,
+                    
+                    "door_closed": door_closed,
+                    "pilot_on": self.gpio.pilot_state,
+                    "fan_on": self.gpio.fan_state
                 }
 
                 self.history.append(
