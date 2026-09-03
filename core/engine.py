@@ -6,6 +6,8 @@ from .sensors import SoCSensor, AmbientSensor
 from .storage import DataStorage
 from .alerts import AlertManager
 from reporting.generator import ReportGenerator
+from .alerts import AlertManager
+from .outputs import GPIOController
 
 
 class MonitoringEngine:
@@ -23,6 +25,9 @@ class MonitoringEngine:
         # Sensores
         self.soc_sensor = SoCSensor()
         self.amb_sensor = AmbientSensor(config)
+        
+        #gpio
+        self.gpio = GPIOController(config)
 
         # Servicios
         self.storage = DataStorage(config)

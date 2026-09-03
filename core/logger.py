@@ -1,6 +1,8 @@
 import logging
 from logging.handlers import RotatingFileHandler
 
+
+
 def setup_logger(log_file="sistema.log"):
     logger = logging.getLogger("TempMonitor")
     logger.setLevel(logging.INFO)

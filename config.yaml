@@ -25,3 +25,14 @@ api:
 sensor_tht03r:
   cfg_file: "/home/pi/lab1/lab1/tht03r.yml"
   cfg_section: "tht03r_sensor"
+gpio:
+  ventilador:
+    pin: 11
+    temp_on: 50.0
+    temp_off: 45.0
+    active_high: true
+
+  piloto:
+    pin: 5
+    cambiar_cada_ciclos: 3
+    active_high: true
