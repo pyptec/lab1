@@ -1,0 +1,9 @@
+PyYAML
+Flask
+matplotlib
+minimalmodbus
+pyserial
+gpiozero
+smbus2
+# Controlador GPIO necesario dentro del entorno virtual en Raspberry Pi.
+lgpio; sys_platform == "linux"

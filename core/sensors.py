@@ -1,4 +1,5 @@
 import random
+from pathlib import Path
 import yaml
 import minimalmodbus
 import serial
@@ -35,10 +36,9 @@ class AmbientSensor:
 
         sensor_cfg = config.get("sensor_tht03r", {})
 
-        self.cfg_file = sensor_cfg.get(
-            "cfg_file",
-            "/home/pi/lab1/lab1/tht03r.yml"
-        )
+        self.cfg_file = Path(sensor_cfg.get("cfg_file", "tht03r.yml"))
+        if not self.cfg_file.is_absolute():
+            self.cfg_file = Path(__file__).resolve().parents[1] / self.cfg_file
 
         self.cfg_section = sensor_cfg.get(
             "cfg_section",
@@ -57,7 +57,7 @@ class AmbientSensor:
         """
 
         try:
-            with open(self.cfg_file, "r") as f:
+            with open(self.cfg_file, "r", encoding="utf-8") as f:
                 cfg = yaml.safe_load(f)
 
             self.sensor_config = (

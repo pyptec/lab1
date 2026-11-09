@@ -1,10 +1,11 @@
+from pathlib import Path
 import yaml
 import minimalmodbus
 import serial
 
 
 def cargar_sensor():
-    with open("tht03r.yml", "r") as f:
+    with open(Path(__file__).resolve().with_name("tht03r.yml"), "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
 
     sensor = cfg["medidores"]["tht03r_sensor"]
@@ -101,7 +102,7 @@ if __name__ == "__main__":
     except FileNotFoundError:
         print("ERROR: No se encontró el archivo tht03r.yml")
         print("Debe estar en:")
-        print("/home/pi/lab1/lab1/tht03r.yml")
+        print(Path(__file__).resolve().with_name("tht03r.yml"))
 
     except KeyError as e:
         print(f"ERROR en la estructura del YAML: falta {e}")
