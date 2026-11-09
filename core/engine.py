@@ -77,7 +77,7 @@ class MonitoringEngine:
 
                     ts = datetime.now().isoformat()
 
-                    rtc_text = "RTC ERROR"
+                    rtc_text = f"{ts} (reloj del sistema; RTC no disponible)"
 
                 # ==========================================
                 # 1. TEMPERATURA RASPBERRY PI
@@ -186,11 +186,15 @@ class MonitoringEngine:
                     else "OFF"
                 )
 
+                ambient_text = f"{amb_temp:.1f}°C" if amb_temp is not None else "--"
+                humidity_text = f"{humidity:.1f}%" if humidity is not None else "--"
+                soc_text = f"{soc_temp:.1f}°C" if soc_temp is not None else "--"
+
                 logger.info(
                     f"{rtc_text} | "
-                    f"TEMP {amb_temp:.1f}°C | "
-                    f"HR {humidity:.1f}% | "
-                    f"SOC {soc_temp:.1f}°C | "
+                    f"TEMP {ambient_text} | "
+                    f"HR {humidity_text} | "
+                    f"SOC {soc_text} | "
                     f"PUERTA {door_text} | "
                     f"FAN {fan_text} | "
                     f"PILOTO {pilot_text} | "

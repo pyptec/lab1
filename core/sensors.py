@@ -47,6 +47,7 @@ class AmbientSensor:
 
         self.sensor_config = None
         self.instrument = None
+        self._available = False
 
         self._load_config()
         self._create_instrument()
@@ -123,6 +124,9 @@ class AmbientSensor:
                 cfg.get("debug", False)
             )
 
+            # No mantener el puerto abierto entre ciclos.
+            self.instrument.serial.close()
+
             logger.info(
                 f"THT03R Modbus inicializado "
                 f"Puerto={cfg['port']} "
@@ -130,13 +134,22 @@ class AmbientSensor:
                 f"Baud={cfg['baudrate']}"
             )
 
-        except Exception as e:
-
-            logger.error(
-                f"Error inicializando Modbus THT03R: {e}"
+        except (OSError, serial.SerialException) as e:
+            self._disconnect()
+            logger.warning(
+                f"THT03R no disponible en {cfg['port']}: "
+                f"{type(e).__name__}: {e}. Se reintentara en la proxima lectura."
             )
 
-            raise
+    def _disconnect(self):
+        """Liberar una conexion fallida para reconstruirla en el siguiente ciclo."""
+        if self.instrument is not None:
+            try:
+                self.instrument.serial.close()
+            except (OSError, serial.SerialException) as e:
+                logger.warning(f"No se pudo cerrar el puerto THT03R: {e}")
+        self.instrument = None
+        self._available = False
 
     def _read_register(self, name):
         """
@@ -177,6 +190,10 @@ class AmbientSensor:
         """
 
         try:
+            if self.instrument is None:
+                self._create_instrument()
+                if self.instrument is None:
+                    return None, None
 
             temperatura = self._read_register(
                 "Temperature"
@@ -194,6 +211,10 @@ class AmbientSensor:
                 float(humedad), 2
             )
 
+            if not self._available:
+                logger.info("THT03R disponible: lecturas Modbus recuperadas.")
+            self._available = True
+
             logger.info(
                 f"THT03R -> "
                 f"Temperatura: {temperatura}°C | "
@@ -202,13 +223,12 @@ class AmbientSensor:
 
             return temperatura, humedad
 
-        except Exception as e:
-
-            logger.error(
-                f"Error leyendo THT03R por Modbus: "
-                f"{type(e).__name__}: {e}"
+        except (OSError, serial.SerialException, minimalmodbus.ModbusException) as e:
+            self._disconnect()
+            logger.warning(
+                f"THT03R sin lectura valida: {type(e).__name__}: {e}. "
+                "Se reintentara en el siguiente ciclo."
             )
-
             return None, None
 
     def read_temperature(self):

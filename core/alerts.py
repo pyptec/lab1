@@ -12,7 +12,11 @@ class AlertManager:
         Rojo: Crítico
         Amarillo/Naranja: Alerta
         """
-        max_temp = max(temp_soc, temp_amb)
+        temperatures = [value for value in (temp_soc, temp_amb) if value is not None]
+        if not temperatures:
+            logger.warning("Sin temperaturas validas para evaluar alertas.")
+            return
+        max_temp = max(temperatures)
         
         # Secuencias de escape ANSI para colores en terminal
         COLOR_RESET = "\033[0m"

@@ -200,3 +200,30 @@ Las alertas imprimen colores; el envio de correo actual es simulado.
 ```bash
 deactivate
 ```
+
+## Funcionamiento con RTC o THT03R temporalmente ausentes
+
+El arranque no se cancela si falta /dev/ttyS0. Si el puerto no existe, el sensor no responde o una respuesta Modbus es invalida, se registra WARNING con la causa y se devuelve None para temperatura ambiente y humedad. Se libera la conexion fallida y se reconstruye en la siguiente lectura del motor (intervalo configurado, actualmente 5 segundos, mas el tiempo de lectura). Cuando las lecturas vuelven, se registra INFO de recuperacion. No se simulan valores ni se presentan lecturas antiguas como actuales.
+
+Si falta el RTC, se registra WARNING y se usa datetime.now() del sistema; se vuelve a probar el RTC en cada ciclo y se registra su recuperacion. Esto no garantiza que el reloj del sistema este sincronizado.
+
+El log muestra -- para temperaturas/humedad ausentes; la API y el JSON usan null, y el CSV deja esos campos vacios. Las alertas se evaluan con las temperaturas disponibles. Si ninguna esta disponible, se registra una advertencia sin comparar None. Los reportes existentes se omiten con advertencia mientras no haya suficientes datos; no se altera su formato ni se inventan muestras.
+
+GPIO, UPS y API mantienen su comportamiento existente. No se captura indiscriminadamente cualquier error del motor: errores de configuracion o programacion siguen visibles. No se modifican puerto, slave_id, baudrate, registros, umbrales ni pines.
+
+Pruebas sin hardware:
+
+```bash
+cd /home/pi/lab1
+.venv/bin/python -m unittest discover -s tests -p 'test_hardware_failures.py' -v
+```
+
+La suite sustituye los dispositivos por mocks; no abre UART ni GPIO. El logger real puede crear sistema.log en el directorio actual. Se verifican desconexion/recuperacion, RTC ausente, alertas con None, continuidad del motor, API y omision segura de reportes. La validacion realizada fue en Windows con .venv; queda pendiente repetirla y comprobar hardware real en Raspberry Pi.
+
+Ejecucion habitual en Raspberry Pi:
+
+```bash
+cd /home/pi/lab1
+source .venv/bin/activate
+python main.py
+```

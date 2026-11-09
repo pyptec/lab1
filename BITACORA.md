@@ -36,3 +36,16 @@
 - Regresion de rutas: cargado YAML con ruta configurada, predeterminada y absoluta, y con test_modbus.cargar_sensor desde otro directorio; todas correctas. _create_instrument sustituido por mock para impedir apertura serie.
 - Imports internos: 12 modulos importados sin iniciar hardware; core.logger sustituido por logger en memoria para evitar crear sistema.log. No se valida asi la inicializacion real del logger. test_an1.py no importado porque ejecuta I2C al cargarlo.
 - Pendientes: no ejecutado main.py ni hardware/Modbus, no ejecutado instalador apt en Raspberry Pi; lgpio/smbus2 requieren validacion Linux. Script externo UPS ausente; no se conocen sus dependencias.
+
+## 2026-11-09 — Prompt 3
+
+- Objetivo y prompt: permitir operacion continua sin RTC, /dev/ttyS0 o sensor THT03R, registrar fallos y recuperar automaticamente al volver el hardware. El mensaje recibido termina en "PRINC"; se implementaron los requisitos completos recibidos antes de ese corte.
+- Diagnostico: AmbientSensor propagaba SerialException durante construccion e impedia inicializar GPIO/servicios; las lecturas fallidas devolvian None pero el motor intentaba formatearlo como float y AlertManager usaba max con None. RTC ya permitia continuar pero solo registraba ERROR y no notificaba recuperacion.
+- Archivos revisados: core/sensors.py, core/rtc.py, core/engine.py, core/alerts.py, core/storage.py, reporting/generator.py, api/server.py, api/templates/index.html, config.yaml y documentacion; implementacion instalada de minimalmodbus para comprobar apertura/cierre y excepciones.
+- Archivos modificados: core/sensors.py, core/rtc.py, core/engine.py, core/alerts.py, README.md y BITACORA.md. Archivo creado: tests/test_hardware_failures.py.
+- Cambios: capturas especificas de errores de E/S y Modbus; cierre de conexion fallida y reintento por ciclo; WARNING con causa y reintento, INFO al recuperar lecturas; reloj del sistema si RTC falla; log con -- para valores ausentes; alertas usan temperaturas disponibles. None se conserva como dato ausente, sin simulacion.
+- No se modificaron configuracion YAML, pines, umbrales, parametros Modbus, UPS, API ni dependencias. No se agrego systemd porque no se solicito configurar un servicio.
+- Validaciones reales: siete pruebas unittest con .venv Windows, todas OK. Cubren puerto ausente en arranque y recuperacion, desconexion serie, timeout/respuesta invalida y recuperacion, error de configuracion no oculto, RTC ausente/invalido y recuperacion, alertas parciales/sin datos, dos ciclos del motor manteniendo GPIO/UPS/almacenamiento/API, y reportes sin datos completos. Modbus/GPIO/UPS simulados; RTC con archivos temporales; Flask mediante test_client sin servidor de red.
+- Primera ejecucion: seis pruebas pasaron y una fallo por fixture de reporte sin timestamp; se completo el fixture y la suite final paso (7/7). No fue un fallo de produccion.
+- git diff --check sin errores; logger y cache Matplotlib se mantuvieron en carpeta temporal al ejecutar las pruebas.
+- Pendientes: cambios realizados en la copia local Windows, no desplegados ni ejecutados en /home/pi/lab1. No se hicieron lecturas fisicas, ni ejecucion real de main.py, ni validacion de recuperacion con dispositivos reales. Los reportes requieren suficientes datos como antes; relojes y dependencias del script UPS externo conservan sus limitaciones anteriores.
